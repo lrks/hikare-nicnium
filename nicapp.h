@@ -34,4 +34,6 @@
  *   Original file: dpdk-stable-17.05.2/examples/ethtool/ethtool-app/ethapp.c
  */
 
+#include <stdint.h>
+
 void nicapp_main(uint8_t cnt_ports);

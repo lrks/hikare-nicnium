@@ -34,13 +34,13 @@
  *   Original file: dpdk-stable-17.05.2/examples/ethtool/ethtool-app/ethapp.c
  */
 
+#include <rte_ethdev.h>
 #include "nicapp.h"
 
-void get_macaddr(uint8_t portid)
+static void get_macaddr(uint8_t port_id)
 {
 	struct ether_addr mac_addr;
 
-	stat = 0;
 	if (!rte_eth_dev_is_valid_port(port_id)) {
 		printf("Error: Invalid port number %i\n", port_id);
 		return;
@@ -62,7 +62,7 @@ void nicapp_main(uint8_t cnt_ports)
 {
 	uint8_t i;
 
-	for (i=0; i<cnt_ports, i++) {
-		getmacaddr(i);
+	for (i=0; i<cnt_ports; i++) {
+		get_macaddr(i);
 	}
 }
