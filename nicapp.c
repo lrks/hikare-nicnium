@@ -35,6 +35,7 @@
  */
 
 #include <rte_ethdev.h>
+#include <unistd.h>
 #include "nicapp.h"
 
 static void get_macaddr(uint8_t port_id)
@@ -58,11 +59,34 @@ static void get_macaddr(uint8_t port_id)
 		mac_addr.addr_bytes[5]);
 }
 
+static void control_led(uint8_t port_id, int flg)
+{
+	if (flg) {
+		rte_eth_led_on(port_id);
+	} else {
+		rte_eth_led_off(port_id);
+	}
+}
+
+
 void nicapp_main(uint8_t cnt_ports)
 {
-	uint8_t i;
+	int i;
+	uint8_t id;
 
-	for (i=0; i<cnt_ports; i++) {
-		get_macaddr(i);
+	for (id=0; id<cnt_ports; id++) {
+		get_macaddr(id);
+	}
+
+
+	for (i=0; i<10; i++) {
+		for (id=0; id<cnt_ports; id++) {
+			control_led(id, (id + i) % 2);
+		}
+		sleep(1);
+	}
+
+	for (id=0; id<cnt_ports; id++) {
+		control_led(id, 0);
 	}
 }
