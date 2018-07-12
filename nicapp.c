@@ -36,7 +36,7 @@
 
 #include <rte_ethdev.h>
 #include <unistd.h>
-#include <time.h>
+#include <sys/time.h>
 #include "nicapp.h"
 
 static void get_macaddr(uint8_t port_id)
@@ -69,27 +69,6 @@ static void control_led(uint8_t port_id, int flg)
 	}
 }
 
-static void led_oscillator(uint8_t port_id)
-{
-	while (1) {
-		rte_eth_led_on(port_id);
-		rte_eth_led_off(port_id);
-	}
-}
-
-static void led_pwm(uint8_t port_id, int ratio)
-{
-	int i;
-	int on = ratio % 10;
-	int off = 10 - on;
-
-	while (1) {
-		for (i=0; i<on; i++) rte_eth_led_on(port_id);
-		for (i=0; i<off; i++) rte_eth_led_off(port_id);
-	}
-}
-
-
 void nicapp_main(uint8_t cnt_ports)
 {
 	int i;
@@ -100,7 +79,7 @@ void nicapp_main(uint8_t cnt_ports)
 	}
 
 
-	for (i=0; i<3; i++) {
+	for (i=0; i<10; i++) {
 		for (id=0; id<cnt_ports; id++) {
 			control_led(id, (id + i) % 2);
 		}
@@ -110,17 +89,4 @@ void nicapp_main(uint8_t cnt_ports)
 	for (id=0; id<cnt_ports; id++) {
 		control_led(id, 0);
 	}
-
-	//led_oscillator(0);
-	//led_pwm(0, 0);
-	led_pwm(0, 1);
-	//led_pwm(0, 2);
-	//led_pwm(0, 3);
-	//led_pwm(0, 4);
-	//led_pwm(0, 5);
-	//led_pwm(0, 6);
-	//led_pwm(0, 7);
-	//led_pwm(0, 8);
-	//led_pwm(0, 9);
-	//led_pwm(0, 10);
 }
