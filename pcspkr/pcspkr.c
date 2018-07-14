@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/kd.h>
+#include <math.h>
 #include "pcspkr.h"
 
-void a2ts(struct timespec *ts, const char *str)
+static void a2ts(struct timespec *ts, const char *str)
 {
 	int ms = atoi(str);
 	ts->tv_sec = (time_t)(ms / 1000);
@@ -27,11 +33,11 @@ void pcspkr(void (*led_on)(void *), void (*led_off)(void *), void *arg)
 			func = led_off;
 			a2ts(&req, &buf[1]);
 			break;
-		case '1:'
+		case '1':
 			a2ts(&req, &buf[4]);
 			func = led_on;
 			buf[4] = '\0';
-			note = atoi(&buf[2]);
+			note = atoi(&buf[1]);
 			break;
 		default:
 			continue;
@@ -40,11 +46,16 @@ void pcspkr(void (*led_on)(void *), void (*led_off)(void *), void *arg)
 		(*func)(arg);
 		if (note == 0) {
 			ioctl(fd, KIOCSOUND, 0);
+			fprintf(stderr, "-_-, %ld[s]+%ld[ns]\n", req.tv_sec, req.tv_nsec);
 		} else {
 			double freq = 440 * pow(2, (double)(note - 69) / (double)12);
 			int val = (int)(CLOCK_TICK_RATE / freq);
 			ioctl(fd, KIOCSOUND, val);
+			fprintf(stderr, "^_^, %d[Hz], %ld[s]+%ld[ns]\n", (int)freq, req.tv_sec, req.tv_nsec);
 		}
 		nanosleep(&req, NULL);
 	}
+
+	ioctl(fd, KIOCSOUND, 0);
+	(*led_off)(arg);
 }

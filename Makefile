@@ -1,5 +1,9 @@
+.PHONY: dpdk ethtool
+
 dpdk:
-	cd dpdk && make
+	cd dpdk && make clean && $(MAKE)
+	cp dpdk/build/nicnium-dpdk ./
 
 ethtool:
-	cd ethtool && make
+	cd ethtool && $(MAKE)
+	cp ethtool/nicnium-ethtool ./
