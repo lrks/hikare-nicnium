@@ -8,15 +8,17 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
+#include "../pcspkr/pcspkr.h"
 
 #define ETHTOOL_LED_VALUE(arg) ((struct ethtool_led_value *)(arg))
 
 struct ethtool_led_value {
 	int fd;
 	struct ifreq *ifr;
-	int status;
+	int err;
+	pthread_t thread;
+	int thread_alive;
 };
-
 
 void *ethtool_led_on(void *args)
 {
@@ -32,8 +34,24 @@ void *ethtool_led_on(void *args)
 	if (err < 0)
 		printf("ERROR: do_phys_id, %d\n", err);
 
-	ETHTOOL_LED_VALUE(args)->status = err;
+	ETHTOOL_LED_VALUE(args)->err = err;
 	return args;
+}
+
+void led_on(void *args)
+{
+	if (ETHTOOL_LED_VALUE(args)->thread_alive)
+		return;
+	pthread_create(&(ETHTOOL_LED_VALUE(args)->thread), NULL, ethtool_led_on, args);
+	ETHTOOL_LED_VALUE(args)->thread_alive = 1;
+}
+
+void led_off(void *args)
+{
+	if (!(ETHTOOL_LED_VALUE(args)->thread_alive))
+		return;
+	pthread_cancel(ETHTOOL_LED_VALUE(args)->thread);
+	ETHTOOL_LED_VALUE(args)->thread_alive = 0;
 }
 
 int main(int argc, char *argv[])
@@ -53,19 +71,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-
-	struct timespec req = { 0, 10 * 1000 * 1000 }; // Todo: ドライバとHzから求める
-	struct ethtool_led_value args = { fd, &ifr, 0 };
-	while (args.status >= 0) {
-		pthread_t thread;
-		pthread_create(&thread, NULL, ethtool_led_on, (void *)&args);
-		nanosleep(&req, NULL);
-
-		int r = pthread_cancel(thread);
-		if (r != 0)
-			break;
-		sleep(1);
-	}
+	struct ethtool_led_value args;
+	args.fd = fd;
+	args.ifr = &ifr;
+	args.err = 0;
+	//args.thread = ;
+	args.thread_alive = 0;
+	pcspkr(&led_on, &led_off, (void *)&args);
 
 	close(fd);
 	return 0;
