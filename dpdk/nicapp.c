@@ -36,7 +36,7 @@
 
 #include <rte_ethdev.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <time.h>
 #include "nicapp.h"
 
 static void get_macaddr(uint8_t port_id)
@@ -70,11 +70,10 @@ void nicapp_main(uint8_t cnt_ports)
 	int i;
 	uint8_t id;
 
-	for (id=0; id<cnt_ports; id++) {
+	for (id=0; id<cnt_ports; id++)
 		get_macaddr(id);
-	}
 
-
+	/*
 	for (i=0; i<10; i++) {
 		for (id=0; id<cnt_ports; id++)
 			control_led(id, (id + i) % 2);
@@ -83,4 +82,13 @@ void nicapp_main(uint8_t cnt_ports)
 
 	for (id=0; id<cnt_ports; id++)
 		control_led(id, 0);
+	*/
+
+	while (1) {
+		struct timespec req = { 0, 10 * 1000 * 1000 };
+		rte_eth_led_on(0);
+		nanosleep(&req, NULL);
+		rte_eth_led_off(0);
+		sleep(1);
+	}
 }
