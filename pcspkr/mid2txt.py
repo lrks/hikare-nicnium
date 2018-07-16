@@ -45,7 +45,7 @@ def noteEvents(input):
 	events.sort(key=lambda xmsg: xmsg.msg.time)
 	return events
 
-def write(output, prev, next):
+def save(output, prev, next):
 	if prev.msg.type == 'note_off' and next.msg.type == 'note_on':
 		hz = 0
 	elif prev.msg.type == 'note_on' and next.msg.type == 'note_off':
@@ -62,33 +62,37 @@ def write(output, prev, next):
 		output.append(next)
 
 
-def simple(input, output):
-	prev = None
-	for event in noteEvents(input):
+def simple(events):
+	results = []
+	for event in events:
+		prev = None if len(results) == 0 else results[-1]
 		if event.msg.type == 'note_on':
-			if prev is None:
-				prev = event
-			elif prev.msg.type == 'note_off':
-				write(output, prev, event)
-				prev = event
+			if len(results) == 0 or prev.msg.type == 'note_off':
+				results.append(event)
 		elif event.msg.type == 'note_off':
 			if prev.msg.type == 'note_on' and prev.msg.channel == event.msg.channel and prev.msg.note == event.msg.note and prev.track == event.track:
-				write(output, prev, event)
-				prev = event
+				results.append(event)
 		elif event.msg.type == 'aftertouch':
 			if event.msg.value == 0 and prev.msg.type == 'note_on' and prev.msg.channel == event.msg.channel and prev.track == event.track:
 				event.msg = mido.Message('note_off', channel=event.msg.channel, note=prev.msg.note, velocity=127, time=event.msg.time)
-				write(output, prev, event)
-				prev = event
+				results.append(event)
+	return results
 
 
 if __name__ == '__main__':
 	input_name = sys.argv[1]
 	output_name = None if len(sys.argv) < 3 else sys.argv[2]
-
 	input = mido.MidiFile(input_name)
 	tracks = None if output_name is None else []
-	simple(input, tracks)
+
+	events = noteEvents(input)
+	results = simple(events)
+
+	for i in range(len(results) - 1):
+		prev = results[i]
+		next = results[i+1]
+		save(tracks, prev, next)
+
 	if output_name is not None:
 		track = mido.MidiTrack()
 		prevtick = 0
