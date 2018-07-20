@@ -30,9 +30,24 @@ class Notes:
 		if self.results is None:
 			raise Exception('Result is None')
 
+		results = []
+		for ev in self.results:
+			if ev.msg.type != 'note_on':
+				target = None
+				for i in reversed(range(len(results))):
+					if results[i].msg.type == 'note_on':
+						target = i
+						break
+				if target is not None:
+					duration = ev.msg.time - results[target].msg.time
+					if duration < 0.025:
+						del results[target]
+						continue
+			results.append(ev)
+
 		tracks = None if output_name is None else []
-		for i in range(len(self.results) - 1):
-			self.__save(tracks, self.results[i], self.results[i+1])
+		for i in range(len(results) - 1):
+			self.__save(tracks, results[i], results[i+1])
 
 		if tracks is not None:
 			track = mido.MidiTrack()
@@ -252,7 +267,7 @@ class Algorithm:
 			w = [ 0.4, 0.4, 0.2 ]
 			rank = {}
 			for key in trch.keys():
-				rank[key] = sum([ w[i] * (params[key][i] / params['max'][i]) ])
+				rank[key] = sum([ w[i] * (params[key][i] / params['max'][i]) for i in range(3) ])
 			return max(rank.items(), key=lambda x:x[1])[0]
 
 
@@ -278,7 +293,6 @@ class Algorithm:
 						continue
 			notes[key].append(ev)
 
-
 		tracks = {}
 		for key in notes.keys():
 			id = key.split('-')[0]
@@ -298,8 +312,10 @@ class Algorithm:
 		channel = selectTrackOrChannel(channels)
 
 		extract = []
+		track = int(track)
+		channel = int(channel)
 		for ev in events:
-			if int(track) == ev.track or int(channel) == ev.msg.channel:
+			if track == ev.track and channel == ev.msg.channel:
 				extract.append(ev)
 		return Algorithm.skyline(extract)
 
@@ -321,4 +337,10 @@ if __name__ == '__main__':
 		notes.results = Algorithm.bestk(notes.notes)
 	elif args.method == 'sudha07':
 		notes.results = Algorithm.sudha07(notes.notes)
+	else:
+		raise Exception('%s is not method.' % args.method)
+	
+	# 0.05s以下は消しても良いかも
+	
+	
 	notes.save(args.outputFile)
