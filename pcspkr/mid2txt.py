@@ -147,29 +147,37 @@ def bestk(events):
 
 	histograms = {}
 	for key in notes.keys():
-		tmp = [ 0 ] * 12
+		histograms[key] = [ 0 ] * 12
 		for ev in notes[key]:
 			if ev.msg.type == 'note_on':
-				tmp[ev.msg.note % 12] += 1
-		histograms[key] = [ v / sum(tmp) for v in tmp ]
+				histograms[key][ev.msg.note % 12] += 1
+		print('KORE=>', histograms[key])
+
 	hbar = [ len(notes) ] * 12
 	hwbar = [ 1 ] * 12
 	for i in range(12):
 		s = sum([ histograms[k][i] for k in notes.keys() ])
 		hbar[i] = s / hbar[i]
 		hwbar[i] = s * hwbar[i]
-	threshold = np.linalg.norm(np.array(hbar)-np.array(hwbar)) / 2
+	#threshold = np.linalg.norm(np.array(hbar)-np.array(hwbar)) / 2
 
 	aggregate = linkage([ histograms[k] for k in notes.keys() ], method='ward', metric='euclidean')
+	threshold = 0.25 * np.max(aggregate[:, 2])
 	cluster = fcluster(aggregate, threshold, criterion='distance')
 	clusters = [ None ] * max(cluster)
 	for idx, id in enumerate(cluster):
 		if clusters[id-1] is None:
 			clusters[id-1] = []
 		clusters[id-1].append(list(notes.keys())[idx])
+	
+	print('------------------')
+	for i, k in enumerate(notes.keys()):
+		print(cluster[i], k, histograms[k], xs[k])
+	
 
 	best = [ min(clusters[i], key=lambda k: -xs[k]) for i in range(len(clusters)) ]
 	results = []
+	print(best)
 	for ev in events:
 		key = '%d-%d'% (ev.track, ev.msg.channel)
 		if key in best:
@@ -186,6 +194,115 @@ def zeroskyline(events):
 	keys.sort()
 	return skyline(list(filter(lambda ev:('%d-%d'% (ev.track, ev.msg.channel)) == keys[0], events)))
 
+def sudha2007(events):
+	def selectTrackOrChannel(trch):
+		def noteRate(evs):
+			count = 0
+			for ev in evs:
+				if ev.msg.type == 'note_on':
+					count += 1
+			return count
+
+		def levelCrossRate(evs):
+			count = 0
+			mean = 0
+			for ev in evs:
+				if ev.msg.type == 'note_on':
+					count += 1
+					mean += ev.msg.note
+			mean /= count
+
+			count = 0
+			plus = None
+			for ev in evs:
+				if ev.msg.type != 'note_on':
+					continue
+				tmp = ev.msg.note > mean
+				if plus is not None:
+					count += 1 if plus != tmp else 0
+				plus = tmp
+			return count
+
+		def distinctNoteCount(evs):
+			distinct = []
+			for ev in evs:
+				if ev.msg.type == 'note_on':
+					if ev.msg.note not in distinct:
+						distinct.append(ev.msg.note)
+			return len(distinct)
+
+		params = {}
+		params['max'] = [ 0, 0, 0 ]
+		for key in trch.keys():
+			nr = noteRate(trch[key])
+			lcr = levelCrossRate(trch[key])
+			dnc = distinctNoteCount(trch[key])
+			params[key] = [ nr, lcr, dnc ]
+			for i in range(3):
+				params['max'][i] = max(params[key][i], params['max'][i])
+
+		rk = {}
+		for key in trch.keys():
+			rk[key] = 0.4 * (params[key][0] / params['max'][0])
+			rk[key] += 0.4 * (params[key][1] / params['max'][1])
+			rk[key] += 0.2 * (params[key][2] / params['max'][2])
+		track = max(rk.items(), key=lambda x:x[1])[0]
+		return rk
+
+
+	notes = {}
+	for ev in events:
+		key = '%d-%d'% (ev.track, ev.msg.channel)
+		if key not in notes:
+			notes[key] = []
+
+		if ev.msg.type == 'note_off' or (ev.msg.type == 'aftertouch' and ev.msg.velocity == 0):
+			target = None
+			for i in reversed(range(len(notes[key]))):
+				if notes[key][i].msg.type == 'note_on' and notes[key][i].msg.note == ev.msg.note:
+					target = i
+					break
+			if target is not None:
+				duration = ev.msg.time - notes[key][target].msg.time
+				if duration < 0.2 or duration > 2:
+					del notes[key][target]
+					continue
+		notes[key].append(ev)
+
+	tracks = {}
+	for key in notes.keys():
+		id = key.split('-')[0]
+		if len(notes[key]) == 0:
+			continue
+		if id not in tracks:
+			tracks[id] = []
+		tracks[id].extend(notes[key])
+		tracks[id].sort(key=lambda xmsg: xmsg.msg.time)
+	rk = selectTrackOrChannel(tracks)
+	track = max(rk.items(), key=lambda x:x[1])[0]
+
+	channels = {}
+	for key in notes.keys():
+		id = key.split('-')
+		if id[0] != track:
+			continue
+		if len(notes[key]) == 0:
+			continue
+		if id[1] not in channels:
+			channels[id[1]] = []
+		channels[id[1]].extend(notes[key])
+		channels[id[1]].sort(key=lambda xmsg: xmsg.msg.time)
+	rc = selectTrackOrChannel(channels)
+	channel = max(rc.items(), key=lambda x:x[1])[0]
+
+	print(notes.keys())
+	print('selected', track, channel)
+	extract = []
+	for ev in events:
+		if int(track) == ev.track or int(channel) == ev.msg.channel:
+			extract.append(ev)
+	return skyline(extract)
+
 
 if __name__ == '__main__':
 	input_name = sys.argv[1]
@@ -197,7 +314,8 @@ if __name__ == '__main__':
 	#results = simple(events)
 	#results = skyline(events)
 	#results = bestk(events)
-	results = zeroskyline(events)
+	#results = zeroskyline(events)
+	results = sudha2007(events)
 
 	for i in range(len(results) - 1):
 		prev = results[i]
