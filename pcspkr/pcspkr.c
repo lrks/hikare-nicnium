@@ -20,35 +20,26 @@ void pcspkr(void (*led_on)(void *), void (*led_off)(void *), void *arg)
 {
 	char buf[BUFLEN];
 
-	int note;
+	double freq;
 	void (*func)(void *);
 	struct timespec req;
 
 	int fd = open(DEVICE_CONSOLE, O_WRONLY);
 
 	while (fgets(buf, BUFLEN, stdin) != NULL) {
-		switch (buf[0]) {
-		case '0':
-			note = 0;
-			func = led_off;
-			a2ts(&req, &buf[1]);
-			break;
-		case '1':
-			a2ts(&req, &buf[4]);
-			func = led_on;
-			buf[4] = '\0';
-			note = atoi(&buf[1]);
-			break;
-		default:
+		if (strlen(buf) < 7)
 			continue;
-		}
+		buf[5] = '\0';
+
+		freq = atof(buf);
+		a2ts(&req, &buf[6]);
+		func = (freq == 0.0) ? led_off : led_on;
 
 		(*func)(arg);
-		if (note == 0) {
+		if (freq == 0.0) {
 			ioctl(fd, KIOCSOUND, 0);
 			fprintf(stderr, "-_-, %ld[s]+%ld[ns]\n", req.tv_sec, req.tv_nsec);
 		} else {
-			double freq = 440 * pow(2, (double)(note - 69) / (double)12);
 			int val = (int)(CLOCK_TICK_RATE / freq);
 			ioctl(fd, KIOCSOUND, val);
 			fprintf(stderr, "^_^, %d[Hz], %ld[s]+%ld[ns]\n", (int)freq, req.tv_sec, req.tv_nsec);
